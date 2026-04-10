@@ -1,0 +1,1 @@
+/home/tomi/st/stm32cubeide_2.1.1/plugins/com.st.stm32cube.ide.mcu.externaltools.stlink-gdb-server.linux64_2.2.400.202601091506/tools/bin/ST-LINK_gdbserver -p 61234 -l 1 -d -s -cp /home/tomi/st/stm32cubeide_2.1.1/plugins/com.st.stm32cube.ide.mcu.externaltools.cubeprogrammer.linux64_2.2.400.202601091506/tools/bin -m 1 -k
