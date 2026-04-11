@@ -2,7 +2,7 @@
 #include "stm32h5xx_nucleo.h"
 #include "task.h"
 
-#include "desafio5.h"
+#include "desafio7.h"
 
 typedef struct _blinkyArgs {
     uint32_t ms_delay;
@@ -26,7 +26,7 @@ void blinky(void *void_args) {
 
 int my_main() {
     
-    desafio5();
+    desafio7();
 
     vTaskStartScheduler();
 
