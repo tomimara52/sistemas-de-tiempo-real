@@ -41,7 +41,7 @@ void blinky_priorizer(void *void_blinky_handle) {
     }
 }
 
-void USER_BUTTON_Callback() {
+__weak void USER_BUTTON_Callback() {
     BaseType_t higher_prio_task_awoken = pdFALSE;
 
     xSemaphoreGiveFromISR(sem, &higher_prio_task_awoken);
