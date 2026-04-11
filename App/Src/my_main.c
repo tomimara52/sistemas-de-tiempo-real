@@ -2,31 +2,11 @@
 #include "stm32h5xx_nucleo.h"
 #include "task.h"
 
-#include "desafio7.h"
-
-typedef struct _blinkyArgs {
-    uint32_t ms_delay;
-    GPIO_TypeDef* port;
-    uint16_t pin;
-} BlinkyArg;
-
-void blinky(void *void_args) {
-    BlinkyArg args = *((BlinkyArg*) void_args);
-
-    TickType_t last_wake_time = xTaskGetTickCount();
-
-    for (;;) {
-        HAL_GPIO_TogglePin(args.port, args.pin);
-
-        vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(args.ms_delay));
-    }
-}
-
-
+#include "desafio8.h"
 
 int my_main() {
     
-    desafio7();
+    desafio8();
 
     vTaskStartScheduler();
 
