@@ -1,15 +1,16 @@
+#include "button.h"
 #include "stm32h5xx_nucleo.h"
 
 __weak void USER_BUTTON_Callback() {}
 
-void UserButton_Init() {
+void UserButton_Init(uint32_t gpio_mode) {
   __HAL_RCC_GPIOC_CLK_ENABLE();
 
   GPIO_InitTypeDef gpio_init_structure;
   gpio_init_structure.Pin = GPIO_PIN_13;
   gpio_init_structure.Pull = GPIO_PULLDOWN;
   gpio_init_structure.Speed = GPIO_SPEED_FREQ_HIGH;
-  gpio_init_structure.Mode = GPIO_MODE_IT_RISING;
+  gpio_init_structure.Mode = gpio_mode;
 
   HAL_GPIO_Init(GPIOC, &gpio_init_structure);
 

@@ -16,7 +16,7 @@ void USER_BUTTON_Callback() {
 }
 
 int my_main() {
-    UserButton_Init();
+    UserButton_Init(GPIO_MODE_IT_RISING);
     xTaskCreate(blinky, "blinky", 100, NULL, 0, NULL);
     vTaskStartScheduler();
 
