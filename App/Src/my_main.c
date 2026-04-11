@@ -2,11 +2,11 @@
 #include "stm32h5xx_nucleo.h"
 #include "task.h"
 
-#include "desafio9.h"
+#include "desafio10.h"
 
 int my_main() {
     
-    desafio9();
+    desafio10();
 
     vTaskStartScheduler();
 
