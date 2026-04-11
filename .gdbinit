@@ -1,3 +1,4 @@
+set pagination off
 set architecture armv8-m.main
 target extended-remote :61234
 monitor reset
