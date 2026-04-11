@@ -35,6 +35,8 @@ void blinky_priorizer(void *void_blinky_handle) {
 
         vTaskDelay(pdMS_TO_TICKS(3000));
 
+        printf("returning blinky red to original priotity\n");
+
         vTaskPrioritySet(blinky_handle, blinky_priority);
     }
 }
