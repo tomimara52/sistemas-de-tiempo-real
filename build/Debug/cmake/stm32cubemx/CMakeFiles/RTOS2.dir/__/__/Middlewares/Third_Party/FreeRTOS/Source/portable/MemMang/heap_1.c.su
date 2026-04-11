@@ -1,5 +1,0 @@
-/home/tomi/STM32CubeIDE/workspace_2.1.1/str/Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang/heap_1.c:79:8:pvPortMalloc	24	static
-/home/tomi/STM32CubeIDE/workspace_2.1.1/str/Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang/heap_1.c:143:6:vPortFree	16	static
-/home/tomi/STM32CubeIDE/workspace_2.1.1/str/Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang/heap_1.c:155:6:vPortInitialiseBlocks	4	static
-/home/tomi/STM32CubeIDE/workspace_2.1.1/str/Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang/heap_1.c:162:8:xPortGetFreeHeapSize	4	static
-/home/tomi/STM32CubeIDE/workspace_2.1.1/str/Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang/heap_1.c:174:6:vPortHeapResetState	4	static

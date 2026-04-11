@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/tomi/STM32CubeIDE/workspace_2.1.1/str/build/cmake_install.cmake",
-		"/home/tomi/STM32CubeIDE/workspace_2.1.1/str/build/cmake/stm32cubemx/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
