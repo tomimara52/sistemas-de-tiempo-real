@@ -60,6 +60,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    App/Src/desafio5.c
     App/Src/my_main.c
     App/Src/button.c
     App/Src/
