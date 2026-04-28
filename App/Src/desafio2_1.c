@@ -35,7 +35,7 @@ static void display() {
     }
 }
 
-void USER_BUTTON_Callback() {
+__weak void USER_BUTTON_Callback() {
     BaseType_t higher_prio_task_awoken = pdFALSE;
 
     xSemaphoreGiveFromISR(counter_sem, &higher_prio_task_awoken);
