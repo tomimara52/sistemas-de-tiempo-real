@@ -66,6 +66,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     App/Src/desafio9.c
     App/Src/desafio10.c
     App/Src/desafio_queue.c
+    App/Src/desafio2_1.c
     App/Src/my_main.c
     App/Src/button.c
     App/Src/
