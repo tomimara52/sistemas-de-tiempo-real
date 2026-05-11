@@ -3,3 +3,5 @@ target extended-remote :61234
 monitor reset
 monitor halt
 load
+
+dashboard stack
