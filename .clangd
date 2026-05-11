@@ -1,4 +1,5 @@
 CompileFlags:
+  CompilationDatabase: "build/Debug"
   Remove:
     - --target=arm-none-eabi
     - -mcpu=cortex-m33
