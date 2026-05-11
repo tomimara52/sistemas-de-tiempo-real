@@ -4,6 +4,11 @@
 #include "queue.h"
 #include "tim.h"
 
+// timer clock: 16Mhz
+// prescaler: 15
+// => frequency: 16Mhz / 16 = 1Mhz
+const float TIMER_FREQ_FLOAT = 1000000.0f;
+
 QueueHandle_t rpm_queue = NULL;
 
 void rpm_calc(void* args) {
@@ -14,7 +19,7 @@ void rpm_calc(void* args) {
         xQueueReceive(rpm_queue, &curr_capture, portMAX_DELAY);
 
         uint32_t period = curr_capture - prev_capture;
-        float rpm = (1000000.0f / period) * 60.0f;
+        float rpm = (TIMER_FREQ_FLOAT / period) * 60.0f;
         prev_capture = curr_capture;
 
         printf("rpm: %d.%02d\t", (int)rpm, ((int)(rpm*100)) % 100);
