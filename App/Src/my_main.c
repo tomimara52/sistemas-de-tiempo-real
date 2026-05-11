@@ -7,7 +7,10 @@
 // timer clock: 16Mhz
 // prescaler: 15
 // => frequency: 16Mhz / 16 = 1Mhz
-const float TIMER_FREQ_FLOAT = 1000000.0f;
+const uint32_t TIMER_FREQ = 1000000;
+const float TIMER_FREQ_FLOAT = (float) TIMER_FREQ;
+const uint32_t MAX_RPM = 6000; // 100 RPS
+const uint32_t MIN_PERIOD = (TIMER_FREQ * 60) / MAX_RPM;
 
 QueueHandle_t rpm_queue = NULL;
 
@@ -19,6 +22,9 @@ void rpm_calc(void* args) {
         xQueueReceive(rpm_queue, &curr_capture, portMAX_DELAY);
 
         uint32_t period = curr_capture - prev_capture;
+
+        if (period < MIN_PERIOD) continue;
+
         float rpm = (TIMER_FREQ_FLOAT / period) * 60.0f;
         prev_capture = curr_capture;
 
