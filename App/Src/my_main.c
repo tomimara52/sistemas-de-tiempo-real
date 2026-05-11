@@ -17,7 +17,8 @@ void rpm_calc(void* args) {
         float rpm = (1000000.0f / period) * 60.0f;
         prev_capture = curr_capture;
 
-        printf("rpm: %d.%02d\n", (int)rpm, ((int)(rpm*100)) % 100);
+        printf("rpm: %d.%02d\t", (int)rpm, ((int)(rpm*100)) % 100);
+        printf("period: %d\n", period);
     }
 }
 
