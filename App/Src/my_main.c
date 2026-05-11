@@ -33,30 +33,38 @@ void rpm_calc(void *args) {
     Event event;
 
     for (;;) {
-        xQueueReceive(rpm_queue, &event, portMAX_DELAY);
+        TickType_t us_to_wait = target_rpm == 0.0f 
+                                    ? portMAX_DELAY
+                                    : (TIMER_FREQ_FLOAT / (target_rpm * (1.0 - TARGET_THRESH))) * 60;
+        if (xQueueReceive(rpm_queue, &event, pdMS_TO_TICKS(us_to_wait/1000)) == pdPASS) {
 
-        if (event.command == NEW_CAPTURE) {
-            uint32_t curr_capture = event.payload;
-            uint32_t period = curr_capture - prev_capture;
+            if (event.command == NEW_CAPTURE) {
+                uint32_t curr_capture = event.payload;
+                uint32_t period = curr_capture - prev_capture;
 
-            if (period < MIN_PERIOD)
-                continue;
+                if (period < MIN_PERIOD)
+                    continue;
 
-            rpm = (TIMER_FREQ_FLOAT / period) * 60.0f;
-            prev_capture = curr_capture;
+                rpm = (TIMER_FREQ_FLOAT / period) * 60.0f;
+                prev_capture = curr_capture;
 
-            printf("rpm: %d.%02d\t", (int)rpm, ((int)(rpm * 100)) % 100);
-            printf("period: %d\n", period);
+                printf("rpm: %d.%02d\t", (int)rpm, ((int)(rpm * 100)) % 100);
+                printf("period: %d\n", period);
 
-            if (target_rpm != 0 &&
-                (target_rpm - rpm) * (target_rpm - rpm) >
-                    rpm * rpm * TARGET_THRESH * TARGET_THRESH) {
-                HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-            } else {
-                HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_2);
+                if (target_rpm != 0 &&
+                    (target_rpm - rpm) * (target_rpm - rpm) >
+                        rpm * rpm * TARGET_THRESH * TARGET_THRESH) {
+                    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+                } else {
+                    HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_2);
+                }
+            } else if (event.command == SET_TARGET) {
+                target_rpm = rpm;
             }
-        } else if (event.command == SET_TARGET) {
-            target_rpm = rpm;
+        } else {
+            printf("target rpm: %d.%02d\t", (int)target_rpm, ((int)(target_rpm * 100)) % 100);
+            printf("us_to_wait: %d\n", us_to_wait);
+            HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
         }
     }
 }
