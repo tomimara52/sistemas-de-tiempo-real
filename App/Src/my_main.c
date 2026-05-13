@@ -77,10 +77,9 @@ void rpm_calc(void *args) {
 
             prev_capture = new_capture;
 
-            xQueueSend(rpm_queue, &rpm, 0);
-        } else {
-            xQueueSend(rpm_queue, &rpm, 0);
-        }
+        } 
+
+        xQueueOverwrite(rpm_queue, &rpm);
     }
 }
 
@@ -107,9 +106,9 @@ void USER_BUTTON_Callback() {
 
 int my_main() {
     ir_queue = xQueueCreate(10, sizeof(uint32_t));
-    rpm_queue = xQueueCreate(10, sizeof(float));
+    rpm_queue = xQueueCreate(1, sizeof(float));
 
-    fsm_set = xQueueCreateSet(10);
+    fsm_set = xQueueCreateSet(1);
     xQueueAddToSet(rpm_queue, fsm_set);
 
     UserButton_Init(GPIO_MODE_IT_RISING);
