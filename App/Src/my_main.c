@@ -13,6 +13,7 @@ const float TIMER_FREQ_FLOAT = (float)TIMER_FREQ;
 
 const uint32_t MAX_RPM = 6000; // 100 RPS
 const uint32_t MIN_PERIOD = (TIMER_FREQ * 60) / MAX_RPM;
+const uint32_t MAX_PERIOD_MS = 6000;
 
 // have to be more than THRESH_PERCENT% away from target_rpm for buzzer to sound
 const uint32_t THRESH_PERCENT = 10;
@@ -22,92 +23,99 @@ const float PERIOD_THRESH_LOWER = 100.0f / (100.0f + (float)THRESH_PERCENT);
 
 const float ALPHA = 0.3f;
 
-QueueHandle_t rpm_queue = NULL;
-
-enum Command {
-    NEW_CAPTURE = 0,
-    SET_TARGET = 1,
+enum Button {
+    BUTTON_SET,
+    BUTTON_RESET,
 };
 
-typedef struct {
-    enum Command command;
-    uint32_t payload;
-} Event;
+enum State {
+    STOPPED,
+    RUNNING,
+    TARGET_SET,
+};
+
+QueueHandle_t ir_queue = NULL;
+QueueHandle_t rpm_queue = NULL;
+QueueHandle_t button_queue = NULL;
+QueueSetHandle_t fsm_set = NULL;
+
+void fsm(void* args) {
+    enum State state = STOPPED;
+
+    for (;;) {
+         QueueSetMemberHandle_t selected = xQueueSelectFromSet(fsm_set, portMAX_DELAY);
+        
+        if (selected == rpm_queue) {
+            float rpm;
+            xQueueReceive(rpm_queue, &rpm, 0);
+
+            if (rpm == 0.0f) {
+                state = STOPPED;
+                printf("stopped\t");
+            } else if (state == STOPPED && rpm > 0.0f) {
+                state = RUNNING;
+            }
+            printf("rpm: %d.%02d\n", (int)rpm, ((int)(rpm * 100)) % 100);
+        } else if (selected == button_queue) {
+        }
+    }
+}
+
 
 void rpm_calc(void *args) {
     uint32_t prev_capture = 0;
     uint32_t period = 0;
-    uint32_t target_period = 0;
-    Event event;
 
     for (;;) {
-        TickType_t us_to_wait = target_period == 0
-                                    ? portMAX_DELAY
-                                    : ((float)target_period) * PERIOD_THRESH_UPPER;
-        if (xQueueReceive(rpm_queue, &event,
-                          pdMS_TO_TICKS(us_to_wait / 1000)) == pdPASS) {
+        uint32_t new_capture;
+        float rpm = 0.0f;
 
-            if (event.command == NEW_CAPTURE) {
-                uint32_t curr_capture = event.payload;
+        if (xQueueReceive(ir_queue, &new_capture, pdMS_TO_TICKS(MAX_PERIOD_MS)) == pdPASS) {
 
-                period = ALPHA * (curr_capture - prev_capture) + (1.0f - ALPHA) * period;
+            period = ALPHA * (new_capture - prev_capture) + (1.0f - ALPHA) * period;
+            rpm = (TIMER_FREQ_FLOAT / period) * 60.0f;
 
-                if (period < MIN_PERIOD)
-                    continue;
+            prev_capture = new_capture;
 
-                float rpm = (TIMER_FREQ_FLOAT / period) * 60.0f;
-                prev_capture = curr_capture;
-
-                printf("rpm: %d.%02d\t", (int)rpm, ((int)(rpm * 100)) % 100);
-                printf("period: %d\n", period);
-
-                if (target_period != 0 &&
-                    ((float)period > (float)target_period * PERIOD_THRESH_UPPER ||
-                     (float)period < (float)target_period * PERIOD_THRESH_LOWER)) {
-                    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-                } else {
-                    HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_2);
-                }
-            } else if (event.command == SET_TARGET) {
-                target_period = period;
-            }
+            xQueueSend(rpm_queue, &rpm, 0);
         } else {
-            printf("target period: %d\t", target_period);
-            printf("us_to_wait: %d\n", us_to_wait);
-            HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+            xQueueSend(rpm_queue, &rpm, 0);
         }
     }
 }
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
     if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) {
-        Event capture_event = {.command = NEW_CAPTURE};
-        capture_event.payload = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
+        uint32_t capture = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
 
         BaseType_t xHigherPriorityTaskWoken;
 
-        xQueueSendFromISR(rpm_queue, &capture_event, &xHigherPriorityTaskWoken);
+        xQueueSendFromISR(ir_queue, &capture, &xHigherPriorityTaskWoken);
 
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
 }
 
 void USER_BUTTON_Callback() {
-    Event set_target_event = {.command = SET_TARGET};
 
     BaseType_t xHigherPriorityTaskWoken;
 
-    xQueueSendFromISR(rpm_queue, &set_target_event, &xHigherPriorityTaskWoken);
+    //xQueueSendFromISR(rpm_queue, &set_target_event, &xHigherPriorityTaskWoken);
 
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 int my_main() {
-    rpm_queue = xQueueCreate(10, sizeof(Event));
+    ir_queue = xQueueCreate(10, sizeof(uint32_t));
+    rpm_queue = xQueueCreate(10, sizeof(float));
+
+    fsm_set = xQueueCreateSet(10);
+    xQueueAddToSet(rpm_queue, fsm_set);
 
     UserButton_Init(GPIO_MODE_IT_RISING);
 
     xTaskCreate(rpm_calc, "rpm", 300, NULL, 0, NULL);
+    xTaskCreate(fsm, "fsm", 300, NULL, 0, NULL);
 
     HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
 
