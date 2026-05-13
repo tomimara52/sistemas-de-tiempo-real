@@ -20,6 +20,8 @@ const uint32_t THRESH_PERCENT = 10;
 const float PERIOD_THRESH_UPPER = 100.0f / (100.0f - (float)THRESH_PERCENT);
 const float PERIOD_THRESH_LOWER = 100.0f / (100.0f + (float)THRESH_PERCENT);
 
+const float ALPHA = 0.3f;
+
 QueueHandle_t rpm_queue = NULL;
 
 enum Command {
@@ -47,7 +49,8 @@ void rpm_calc(void *args) {
 
             if (event.command == NEW_CAPTURE) {
                 uint32_t curr_capture = event.payload;
-                period = curr_capture - prev_capture;
+
+                period = ALPHA * (curr_capture - prev_capture) + (1.0f - ALPHA) * period;
 
                 if (period < MIN_PERIOD)
                     continue;
