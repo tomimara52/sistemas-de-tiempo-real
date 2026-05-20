@@ -36,9 +36,42 @@ enum State {
 };
 
 QueueHandle_t ir_queue = NULL;
+
 QueueHandle_t rpm_queue_to_fsm = NULL;
 QueueHandle_t button_queue_to_fsm = NULL;
 QueueSetHandle_t fsm_set = NULL;
+
+QueueHandle_t target_queue_to_buzzer = NULL;
+QueueHandle_t rpm_queue_to_buzzer = NULL;
+QueueSetHandle_t buzzer_set = NULL;
+
+
+void buzzer(void* args) {
+    float target = 0.0f;
+    float rpm = 0.0f;
+
+    for (;;) {
+        TickType_t ms_to_wait = target == 0.0f
+                                    ? portMAX_DELAY
+                                    : (60.0f / (target * 0.9f)) * 1000;
+        QueueSetMemberHandle_t selected = xQueueSelectFromSet(buzzer_set, pdMS_TO_TICKS(ms_to_wait));
+        if (selected != NULL) {
+            if (selected == rpm_queue_to_buzzer) {
+                xQueueReceive(rpm_queue_to_buzzer, &rpm, 0);
+            } else if (selected == target_queue_to_buzzer) {
+                xQueueReceive(target_queue_to_buzzer, &target, 0);
+            }
+
+            if (target != 0.0f && (rpm < target * 0.9f || rpm > target * 1.1f)) {
+                HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+            } else {
+                HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_2);
+            }
+        } else {
+            HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+        }
+    }
+}
 
 
 void fsm(void* args) {
@@ -69,6 +102,7 @@ void fsm(void* args) {
                 case BUTTON_SET:
                     target_rpm = rpm;
                     if (state == RUNNING) state = RUNNING_TARGET_SET;
+                    xQueueOverwrite(target_queue_to_buzzer, &target_rpm);
                     break;
                 case BUTTON_RESET:
                     break;
@@ -113,6 +147,7 @@ void rpm_calc(void *args) {
         } 
 
         xQueueOverwrite(rpm_queue_to_fsm, &rpm);
+        xQueueOverwrite(rpm_queue_to_buzzer, &rpm);
     }
 }
 
@@ -140,17 +175,24 @@ void USER_BUTTON_Callback() {
 
 int my_main() {
     ir_queue = xQueueCreate(10, sizeof(uint32_t));
+
     button_queue_to_fsm = xQueueCreate(10, sizeof(enum Button));
     rpm_queue_to_fsm = xQueueCreate(1, sizeof(float));
-
-    fsm_set = xQueueCreateSet(1);
+    fsm_set = xQueueCreateSet(11);
     xQueueAddToSet(rpm_queue_to_fsm, fsm_set);
     xQueueAddToSet(button_queue_to_fsm, fsm_set);
+
+    target_queue_to_buzzer = xQueueCreate(1, sizeof(float));
+    rpm_queue_to_buzzer = xQueueCreate(1, sizeof(float));
+    buzzer_set = xQueueCreateSet(2);
+    xQueueAddToSet(target_queue_to_buzzer, buzzer_set);
+    xQueueAddToSet(rpm_queue_to_buzzer, buzzer_set);
 
     UserButton_Init(GPIO_MODE_IT_RISING);
 
     xTaskCreate(rpm_calc, "rpm", 300, NULL, 0, NULL);
     xTaskCreate(fsm, "fsm", 300, NULL, 0, NULL);
+    xTaskCreate(buzzer, "buzzer", 300, NULL, 0, NULL);
 
     HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
 
