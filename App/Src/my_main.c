@@ -37,7 +37,7 @@ enum State {
 
 QueueHandle_t ir_queue = NULL;
 QueueHandle_t rpm_queue_to_fsm = NULL;
-QueueHandle_t button_queue = NULL;
+QueueHandle_t button_queue_to_fsm = NULL;
 QueueSetHandle_t fsm_set = NULL;
 
 
@@ -61,9 +61,9 @@ void fsm(void* args) {
             } else if (state == STOPPED_TARGET_SET && rpm > 0.0f) {
                 state = RUNNING_TARGET_SET;
             }
-        } else if (selected == button_queue) {
+        } else if (selected == button_queue_to_fsm) {
             enum Button button;
-            xQueueReceive(button_queue, &button, 0);
+            xQueueReceive(button_queue_to_fsm, &button, 0);
 
             switch (button) {
                 case BUTTON_SET:
@@ -133,19 +133,19 @@ void USER_BUTTON_Callback() {
     BaseType_t xHigherPriorityTaskWoken;
 
     enum Button button = BUTTON_SET;
-    xQueueSendFromISR(button_queue, &button, &xHigherPriorityTaskWoken);
+    xQueueSendFromISR(button_queue_to_fsm, &button, &xHigherPriorityTaskWoken);
 
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 int my_main() {
     ir_queue = xQueueCreate(10, sizeof(uint32_t));
-    button_queue = xQueueCreate(10, sizeof(enum Button));
+    button_queue_to_fsm = xQueueCreate(10, sizeof(enum Button));
     rpm_queue_to_fsm = xQueueCreate(1, sizeof(float));
 
     fsm_set = xQueueCreateSet(1);
     xQueueAddToSet(rpm_queue_to_fsm, fsm_set);
-    xQueueAddToSet(button_queue, fsm_set);
+    xQueueAddToSet(button_queue_to_fsm, fsm_set);
 
     UserButton_Init(GPIO_MODE_IT_RISING);
 
