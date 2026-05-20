@@ -35,7 +35,7 @@ enum State {
 };
 
 QueueHandle_t ir_queue = NULL;
-QueueHandle_t rpm_queue = NULL;
+QueueHandle_t rpm_queue_to_fsm = NULL;
 QueueHandle_t button_queue = NULL;
 QueueSetHandle_t fsm_set = NULL;
 
@@ -45,9 +45,9 @@ void fsm(void* args) {
     for (;;) {
          QueueSetMemberHandle_t selected = xQueueSelectFromSet(fsm_set, portMAX_DELAY);
         
-        if (selected == rpm_queue) {
+        if (selected == rpm_queue_to_fsm) {
             float rpm;
-            xQueueReceive(rpm_queue, &rpm, 0);
+            xQueueReceive(rpm_queue_to_fsm, &rpm, 0);
 
             if (rpm == 0.0f) {
                 state = STOPPED;
@@ -79,7 +79,7 @@ void rpm_calc(void *args) {
 
         } 
 
-        xQueueOverwrite(rpm_queue, &rpm);
+        xQueueOverwrite(rpm_queue_to_fsm, &rpm);
     }
 }
 
@@ -107,9 +107,10 @@ void USER_BUTTON_Callback() {
 int my_main() {
     ir_queue = xQueueCreate(10, sizeof(uint32_t));
     rpm_queue = xQueueCreate(1, sizeof(float));
+    rpm_queue_to_fsm = xQueueCreate(1, sizeof(float));
 
     fsm_set = xQueueCreateSet(1);
-    xQueueAddToSet(rpm_queue, fsm_set);
+    xQueueAddToSet(rpm_queue_to_fsm, fsm_set);
 
     UserButton_Init(GPIO_MODE_IT_RISING);
 
