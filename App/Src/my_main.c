@@ -31,7 +31,8 @@ enum Button {
 enum State {
     STOPPED,
     RUNNING,
-    TARGET_SET,
+    RUNNING_TARGET_SET,
+    STOPPED_TARGET_SET,
 };
 
 QueueHandle_t ir_queue = NULL;
@@ -39,25 +40,57 @@ QueueHandle_t rpm_queue_to_fsm = NULL;
 QueueHandle_t button_queue = NULL;
 QueueSetHandle_t fsm_set = NULL;
 
+
 void fsm(void* args) {
     enum State state = STOPPED;
+    float target_rpm = 0.0f;
+    float rpm = 0.0f;
 
     for (;;) {
          QueueSetMemberHandle_t selected = xQueueSelectFromSet(fsm_set, portMAX_DELAY);
         
         if (selected == rpm_queue_to_fsm) {
-            float rpm;
             xQueueReceive(rpm_queue_to_fsm, &rpm, 0);
 
-            if (rpm == 0.0f) {
+            if (state == RUNNING && rpm == 0.0f) {
                 state = STOPPED;
-                printf("stopped\t");
+            } else if (state == RUNNING_TARGET_SET && rpm == 0.0f) {
+                state = STOPPED_TARGET_SET;
             } else if (state == STOPPED && rpm > 0.0f) {
                 state = RUNNING;
+            } else if (state == STOPPED_TARGET_SET && rpm > 0.0f) {
+                state = RUNNING_TARGET_SET;
             }
-            printf("rpm: %d.%02d\n", (int)rpm, ((int)(rpm * 100)) % 100);
         } else if (selected == button_queue) {
+            enum Button button;
+            xQueueReceive(button_queue, &button, 0);
+
+            switch (button) {
+                case BUTTON_SET:
+                    target_rpm = rpm;
+                    if (state == RUNNING) state = RUNNING_TARGET_SET;
+                    break;
+                case BUTTON_RESET:
+                    break;
+            }
         }
+
+        switch (state) {
+            case STOPPED:
+                printf("stopped\t");
+                break;
+            case RUNNING:
+                printf("running\t");
+                break;
+            case RUNNING_TARGET_SET:
+                printf("running target set\t");
+                break;
+            case STOPPED_TARGET_SET:
+                printf("stopped target set\t");
+                break;
+        }
+        printf("rpm: %d.%02d\t", (int)rpm, ((int)(rpm * 100)) % 100);
+        printf("target rpm: %d.%02d\n", (int)target_rpm, ((int)(target_rpm * 100)) % 100);
     }
 }
 
@@ -99,18 +132,20 @@ void USER_BUTTON_Callback() {
 
     BaseType_t xHigherPriorityTaskWoken;
 
-    //xQueueSendFromISR(rpm_queue, &set_target_event, &xHigherPriorityTaskWoken);
+    enum Button button = BUTTON_SET;
+    xQueueSendFromISR(button_queue, &button, &xHigherPriorityTaskWoken);
 
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 int my_main() {
     ir_queue = xQueueCreate(10, sizeof(uint32_t));
-    rpm_queue = xQueueCreate(1, sizeof(float));
+    button_queue = xQueueCreate(10, sizeof(enum Button));
     rpm_queue_to_fsm = xQueueCreate(1, sizeof(float));
 
     fsm_set = xQueueCreateSet(1);
     xQueueAddToSet(rpm_queue_to_fsm, fsm_set);
+    xQueueAddToSet(button_queue, fsm_set);
 
     UserButton_Init(GPIO_MODE_IT_RISING);
 
