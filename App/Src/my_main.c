@@ -13,21 +13,18 @@
 const uint32_t TIMER_FREQ = 1000000;
 const float TIMER_FREQ_FLOAT = (float)TIMER_FREQ;
 
-const uint32_t MAX_RPM = 6000; // 100 RPS
-const uint32_t MIN_PERIOD = (TIMER_FREQ * 60) / MAX_RPM;
 const uint32_t MAX_PERIOD_MS = 6000;
 
 // have to be more than THRESH_PERCENT% away from target_rpm for buzzer to sound
 const uint32_t THRESH_PERCENT = 10;
-// period is inverse of rpm so limits are upside down
-const float PERIOD_THRESH_UPPER = 100.0f / (100.0f - (float)THRESH_PERCENT);
-const float PERIOD_THRESH_LOWER = 100.0f / (100.0f + (float)THRESH_PERCENT);
+const float THRESH_LOWER = 1.0f - ((float)THRESH_PERCENT / 100.0f);
+const float THRESH_UPPER = 1.0f + ((float)THRESH_PERCENT / 100.0f);
 
 const float ALPHA = 0.3f;
 
 const uint32_t PULSE = 500;
 
-const uint32_t BASE_BEEP_PERIOD = 500;
+const uint32_t BASE_BEEP_PERIOD = 750;
 const uint32_t MIN_BEEP_PERIOD = 100;
 const uint32_t RPM_BEEP_STEP = 5;
 
@@ -72,7 +69,7 @@ void buzzer(void *args) {
 
     for (;;) {
         TickType_t ms_to_wait =
-            target == 0.0f ? portMAX_DELAY : (60.0f / (target * 0.9f)) * 1000;
+            target == 0.0f ? portMAX_DELAY : (60.0f / (target * THRESH_LOWER)) * 1000;
         QueueSetMemberHandle_t selected =
             xQueueSelectFromSet(buzzer_set, pdMS_TO_TICKS(ms_to_wait));
         if (selected != NULL) {
@@ -83,7 +80,7 @@ void buzzer(void *args) {
             }
 
             if (target != 0.0f &&
-                (rpm < target * 0.9f || rpm > target * 1.1f)) {
+                (rpm < target * THRESH_LOWER || rpm > target * THRESH_UPPER)) {
 
                 float diff = rpm < target ? target - rpm : rpm - target;
 
