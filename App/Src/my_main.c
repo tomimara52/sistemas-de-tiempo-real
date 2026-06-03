@@ -1,9 +1,11 @@
 #include "FreeRTOS.h"
 #include "button.h"
 #include "queue.h"
+#include "stdbool.h"
 #include "stm32h5xx_nucleo.h"
 #include "task.h"
 #include "tim.h"
+#include "timers.h"
 
 // timer clock: 16Mhz
 // prescaler: 15
@@ -22,6 +24,12 @@ const float PERIOD_THRESH_UPPER = 100.0f / (100.0f - (float)THRESH_PERCENT);
 const float PERIOD_THRESH_LOWER = 100.0f / (100.0f + (float)THRESH_PERCENT);
 
 const float ALPHA = 0.3f;
+
+const uint32_t PULSE = 500;
+
+const uint32_t BASE_BEEP_PERIOD = 500;
+const uint32_t MIN_BEEP_PERIOD = 100;
+const uint32_t RPM_BEEP_STEP = 5;
 
 enum Button {
     BUTTON_SET,
@@ -45,16 +53,28 @@ QueueHandle_t target_queue_to_buzzer = NULL;
 QueueHandle_t rpm_queue_to_buzzer = NULL;
 QueueSetHandle_t buzzer_set = NULL;
 
+TimerHandle_t buzzer_timer = NULL;
+uint32_t buzzer_timer_period = 500;
 
-void buzzer(void* args) {
+void buzzer_timer_cb(TimerHandle_t xTimer) {
+    __HAL_TIM_SET_COMPARE(
+        &htim3, TIM_CHANNEL_2,
+        __HAL_TIM_GET_COMPARE(&htim3, TIM_CHANNEL_2) > 0 ? 0 : PULSE);
+
+    xTimerChangePeriod(xTimer, buzzer_timer_period, 0);
+}
+
+void buzzer(void *args) {
     float target = 0.0f;
     float rpm = 0.0f;
 
+    uint8_t buzzer_buzzing = false;
+
     for (;;) {
-        TickType_t ms_to_wait = target == 0.0f
-                                    ? portMAX_DELAY
-                                    : (60.0f / (target * 0.9f)) * 1000;
-        QueueSetMemberHandle_t selected = xQueueSelectFromSet(buzzer_set, pdMS_TO_TICKS(ms_to_wait));
+        TickType_t ms_to_wait =
+            target == 0.0f ? portMAX_DELAY : (60.0f / (target * 0.9f)) * 1000;
+        QueueSetMemberHandle_t selected =
+            xQueueSelectFromSet(buzzer_set, pdMS_TO_TICKS(ms_to_wait));
         if (selected != NULL) {
             if (selected == rpm_queue_to_buzzer) {
                 xQueueReceive(rpm_queue_to_buzzer, &rpm, 0);
@@ -62,26 +82,52 @@ void buzzer(void* args) {
                 xQueueReceive(target_queue_to_buzzer, &target, 0);
             }
 
-            if (target != 0.0f && (rpm < target * 0.9f || rpm > target * 1.1f)) {
-                HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+            if (target != 0.0f &&
+                (rpm < target * 0.9f || rpm > target * 1.1f)) {
+
+                float diff = rpm < target ? target - rpm : rpm - target;
+
+                buzzer_timer_period =
+                    (diff * RPM_BEEP_STEP < BASE_BEEP_PERIOD - MIN_BEEP_PERIOD)
+                        ? BASE_BEEP_PERIOD - diff * RPM_BEEP_STEP
+                        : MIN_BEEP_PERIOD;
+
+                if (!buzzer_buzzing) {
+                    xTimerChangePeriod(buzzer_timer, buzzer_timer_period,
+                                       portMAX_DELAY);
+                    buzzer_buzzing = true;
+                }
             } else {
-                HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_2);
+                xTimerStop(buzzer_timer, portMAX_DELAY);
+                __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);
+                buzzer_buzzing = false;
             }
         } else {
-            HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+            float diff = rpm < target ? target - rpm : rpm - target;
+
+            buzzer_timer_period =
+                (diff * RPM_BEEP_STEP < BASE_BEEP_PERIOD - MIN_BEEP_PERIOD)
+                    ? BASE_BEEP_PERIOD - diff * RPM_BEEP_STEP
+                    : MIN_BEEP_PERIOD;
+
+            if (!buzzer_buzzing) {
+                xTimerChangePeriod(buzzer_timer, buzzer_timer_period,
+                                   portMAX_DELAY);
+                buzzer_buzzing = true;
+            }
         }
     }
 }
 
-
-void fsm(void* args) {
+void fsm(void *args) {
     enum State state = STOPPED;
     float target_rpm = 0.0f;
     float rpm = 0.0f;
 
     for (;;) {
-         QueueSetMemberHandle_t selected = xQueueSelectFromSet(fsm_set, portMAX_DELAY);
-        
+        QueueSetMemberHandle_t selected =
+            xQueueSelectFromSet(fsm_set, portMAX_DELAY);
+
         if (selected == rpm_queue_to_fsm) {
             xQueueReceive(rpm_queue_to_fsm, &rpm, 0);
 
@@ -99,35 +145,36 @@ void fsm(void* args) {
             xQueueReceive(button_queue_to_fsm, &button, 0);
 
             switch (button) {
-                case BUTTON_SET:
-                    target_rpm = rpm;
-                    if (state == RUNNING) state = RUNNING_TARGET_SET;
-                    xQueueOverwrite(target_queue_to_buzzer, &target_rpm);
-                    break;
-                case BUTTON_RESET:
-                    break;
+            case BUTTON_SET:
+                target_rpm = rpm;
+                if (state == RUNNING)
+                    state = RUNNING_TARGET_SET;
+                xQueueOverwrite(target_queue_to_buzzer, &target_rpm);
+                break;
+            case BUTTON_RESET:
+                break;
             }
         }
 
         switch (state) {
-            case STOPPED:
-                printf("stopped\t");
-                break;
-            case RUNNING:
-                printf("running\t");
-                break;
-            case RUNNING_TARGET_SET:
-                printf("running target set\t");
-                break;
-            case STOPPED_TARGET_SET:
-                printf("stopped target set\t");
-                break;
+        case STOPPED:
+            printf("stopped\t");
+            break;
+        case RUNNING:
+            printf("running\t");
+            break;
+        case RUNNING_TARGET_SET:
+            printf("running target set\t");
+            break;
+        case STOPPED_TARGET_SET:
+            printf("stopped target set\t");
+            break;
         }
         printf("rpm: %d.%02d\t", (int)rpm, ((int)(rpm * 100)) % 100);
-        printf("target rpm: %d.%02d\n", (int)target_rpm, ((int)(target_rpm * 100)) % 100);
+        printf("target rpm: %d.%02d\n", (int)target_rpm,
+               ((int)(target_rpm * 100)) % 100);
     }
 }
-
 
 void rpm_calc(void *args) {
     uint32_t prev_capture = 0;
@@ -137,14 +184,15 @@ void rpm_calc(void *args) {
         uint32_t new_capture;
         float rpm = 0.0f;
 
-        if (xQueueReceive(ir_queue, &new_capture, pdMS_TO_TICKS(MAX_PERIOD_MS)) == pdPASS) {
+        if (xQueueReceive(ir_queue, &new_capture,
+                          pdMS_TO_TICKS(MAX_PERIOD_MS)) == pdPASS) {
 
-            period = ALPHA * (new_capture - prev_capture) + (1.0f - ALPHA) * period;
+            period =
+                ALPHA * (new_capture - prev_capture) + (1.0f - ALPHA) * period;
             rpm = (TIMER_FREQ_FLOAT / period) * 60.0f;
 
             prev_capture = new_capture;
-
-        } 
+        }
 
         xQueueOverwrite(rpm_queue_to_fsm, &rpm);
         xQueueOverwrite(rpm_queue_to_buzzer, &rpm);
@@ -194,7 +242,12 @@ int my_main() {
     xTaskCreate(fsm, "fsm", 300, NULL, 0, NULL);
     xTaskCreate(buzzer, "buzzer", 300, NULL, 0, NULL);
 
+    buzzer_timer = xTimerCreate("buz", 100, pdTRUE, 0, buzzer_timer_cb);
+
     HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
+
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
 
     vTaskStartScheduler();
 
