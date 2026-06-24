@@ -57,12 +57,13 @@ QueueHandle_t rpm_queue_to_buzzer = NULL;
 QueueSetHandle_t buzzer_set = NULL;
 
 TimerHandle_t buzzer_timer = NULL;
-uint32_t buzzer_timer_period = 500;
+uint32_t buzzer_timer_period = BASE_BEEP_PERIOD;
+uint32_t buzzer_arr = BASE_ARR;
 
 void buzzer_timer_cb(TimerHandle_t xTimer) {
-    uint32_t current_arr = __HAL_TIM_GET_AUTORELOAD(&htim3);
-    uint32_t dynamic_pulse = current_arr / 2;
+    uint32_t dynamic_pulse = buzzer_arr / 2;
 
+    __HAL_TIM_SET_AUTORELOAD(&htim3, buzzer_arr);
     __HAL_TIM_SET_COMPARE(
         &htim3, TIM_CHANNEL_2,
         __HAL_TIM_GET_COMPARE(&htim3, TIM_CHANNEL_2) > 0 ? 0 : dynamic_pulse);
@@ -94,8 +95,7 @@ uint8_t update_buzzer(float rpm, float target, uint8_t buzzer_buzzing) {
         }
     }
 
-    // Apply the new frequency to the hardware timer
-    __HAL_TIM_SET_AUTORELOAD(&htim3, new_arr);
+    buzzer_arr = new_arr;
 
     // 3. Manage FreeRTOS software timer state
     if (!buzzer_buzzing) {
@@ -131,7 +131,7 @@ void buzzer(void *args) {
             } else {
                 xTimerStop(buzzer_timer, portMAX_DELAY);
                 __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);
-                __HAL_TIM_SET_AUTORELOAD(&htim3, BASE_ARR); // Reset pitch back to normal
+                buzzer_arr = BASE_ARR;
                 buzzer_buzzing = false;
             }
         } else {
