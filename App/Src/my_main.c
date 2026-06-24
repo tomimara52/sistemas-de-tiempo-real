@@ -28,6 +28,12 @@ const uint32_t BASE_BEEP_PERIOD = 750;
 const uint32_t MIN_BEEP_PERIOD = 100;
 const uint32_t RPM_BEEP_STEP = 5;
 
+// Assuming your default CubeMX ARR for TIM3 is 1000
+const uint32_t BASE_ARR = 1000; 
+const uint32_t PITCH_STEP = 5;       // How much the pitch changes per RPM deviance
+const uint32_t MIN_ARR = 200;        // Upper limit for pitch (preventing ultrasonic/overflow)
+const uint32_t MAX_ARR = 4000;       // Lower limit for pitch (preventing clicking noises)
+
 enum Button {
     BUTTON_SET,
     BUTTON_RESET,
@@ -54,9 +60,12 @@ TimerHandle_t buzzer_timer = NULL;
 uint32_t buzzer_timer_period = 500;
 
 void buzzer_timer_cb(TimerHandle_t xTimer) {
+    uint32_t current_arr = __HAL_TIM_GET_AUTORELOAD(&htim3);
+    uint32_t dynamic_pulse = current_arr / 2;
+
     __HAL_TIM_SET_COMPARE(
         &htim3, TIM_CHANNEL_2,
-        __HAL_TIM_GET_COMPARE(&htim3, TIM_CHANNEL_2) > 0 ? 0 : PULSE);
+        __HAL_TIM_GET_COMPARE(&htim3, TIM_CHANNEL_2) > 0 ? 0 : dynamic_pulse);
 
     xTimerChangePeriod(xTimer, buzzer_timer_period, 0);
 }
@@ -64,14 +73,33 @@ void buzzer_timer_cb(TimerHandle_t xTimer) {
 uint8_t update_buzzer(float rpm, float target, uint8_t buzzer_buzzing) {
     float diff = rpm < target ? target - rpm : rpm - target;
 
+    // 1. Handle Beep Cadence (Interval between beeps)
     buzzer_timer_period =
         (diff * RPM_BEEP_STEP < BASE_BEEP_PERIOD - MIN_BEEP_PERIOD)
             ? BASE_BEEP_PERIOD - diff * RPM_BEEP_STEP
             : MIN_BEEP_PERIOD;
 
+    // 2. Handle Audio Pitch (Frequency of the tone itself)
+    uint32_t new_arr = BASE_ARR;
+    uint32_t change = (uint32_t)(diff * PITCH_STEP);
+
+    if (rpm > target) {
+        // Going too fast -> Higher Pitch -> Lower ARR
+        new_arr = (BASE_ARR > change + MIN_ARR) ? BASE_ARR - change : MIN_ARR;
+    } else {
+        // Going too slow -> Lower Pitch -> Higher ARR
+        new_arr = BASE_ARR + change;
+        if (new_arr > MAX_ARR) {
+            new_arr = MAX_ARR;
+        }
+    }
+
+    // Apply the new frequency to the hardware timer
+    __HAL_TIM_SET_AUTORELOAD(&htim3, new_arr);
+
+    // 3. Manage FreeRTOS software timer state
     if (!buzzer_buzzing) {
-        xTimerChangePeriod(buzzer_timer, buzzer_timer_period,
-                           portMAX_DELAY);
+        xTimerChangePeriod(buzzer_timer, buzzer_timer_period, portMAX_DELAY);
         buzzer_buzzing = true;
     }
 
@@ -103,6 +131,7 @@ void buzzer(void *args) {
             } else {
                 xTimerStop(buzzer_timer, portMAX_DELAY);
                 __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);
+                __HAL_TIM_SET_AUTORELOAD(&htim3, BASE_ARR); // Reset pitch back to normal
                 buzzer_buzzing = false;
             }
         } else {
