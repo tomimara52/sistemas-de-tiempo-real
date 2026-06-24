@@ -61,6 +61,23 @@ void buzzer_timer_cb(TimerHandle_t xTimer) {
     xTimerChangePeriod(xTimer, buzzer_timer_period, 0);
 }
 
+uint8_t update_buzzer(float rpm, float target, uint8_t buzzer_buzzing) {
+    float diff = rpm < target ? target - rpm : rpm - target;
+
+    buzzer_timer_period =
+        (diff * RPM_BEEP_STEP < BASE_BEEP_PERIOD - MIN_BEEP_PERIOD)
+            ? BASE_BEEP_PERIOD - diff * RPM_BEEP_STEP
+            : MIN_BEEP_PERIOD;
+
+    if (!buzzer_buzzing) {
+        xTimerChangePeriod(buzzer_timer, buzzer_timer_period,
+                           portMAX_DELAY);
+        buzzer_buzzing = true;
+    }
+
+    return buzzer_buzzing;
+}  
+
 void buzzer(void *args) {
     float target = 0.0f;
     float rpm = 0.0f;
@@ -81,37 +98,15 @@ void buzzer(void *args) {
 
             if (target != 0.0f &&
                 (rpm < target * THRESH_LOWER || rpm > target * THRESH_UPPER)) {
+                buzzer_buzzing = update_buzzer(rpm, target, buzzer_buzzing);
 
-                float diff = rpm < target ? target - rpm : rpm - target;
-
-                buzzer_timer_period =
-                    (diff * RPM_BEEP_STEP < BASE_BEEP_PERIOD - MIN_BEEP_PERIOD)
-                        ? BASE_BEEP_PERIOD - diff * RPM_BEEP_STEP
-                        : MIN_BEEP_PERIOD;
-
-                if (!buzzer_buzzing) {
-                    xTimerChangePeriod(buzzer_timer, buzzer_timer_period,
-                                       portMAX_DELAY);
-                    buzzer_buzzing = true;
-                }
             } else {
                 xTimerStop(buzzer_timer, portMAX_DELAY);
                 __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);
                 buzzer_buzzing = false;
             }
         } else {
-            float diff = rpm < target ? target - rpm : rpm - target;
-
-            buzzer_timer_period =
-                (diff * RPM_BEEP_STEP < BASE_BEEP_PERIOD - MIN_BEEP_PERIOD)
-                    ? BASE_BEEP_PERIOD - diff * RPM_BEEP_STEP
-                    : MIN_BEEP_PERIOD;
-
-            if (!buzzer_buzzing) {
-                xTimerChangePeriod(buzzer_timer, buzzer_timer_period,
-                                   portMAX_DELAY);
-                buzzer_buzzing = true;
-            }
+            buzzer_buzzing = update_buzzer(rpm, target, buzzer_buzzing);
         }
     }
 }
