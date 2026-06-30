@@ -65,8 +65,8 @@ void buzzer_timer_cb(TimerHandle_t xTimer) {
 
     __HAL_TIM_SET_AUTORELOAD(&htim3, buzzer_arr);
     __HAL_TIM_SET_COMPARE(
-        &htim3, TIM_CHANNEL_2,
-        __HAL_TIM_GET_COMPARE(&htim3, TIM_CHANNEL_2) > 0 ? 0 : dynamic_pulse);
+        &htim3, TIM_CHANNEL_3,
+        __HAL_TIM_GET_COMPARE(&htim3, TIM_CHANNEL_3) > 0 ? 0 : dynamic_pulse);
 
     xTimerChangePeriod(xTimer, buzzer_timer_period, 0);
 }
@@ -130,7 +130,7 @@ void buzzer(void *args) {
 
             } else {
                 xTimerStop(buzzer_timer, portMAX_DELAY);
-                __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);
+                __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 0);
                 buzzer_arr = BASE_ARR;
                 buzzer_buzzing = false;
             }
@@ -267,8 +267,8 @@ int my_main() {
 
     HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
 
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);
-    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 0);
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
 
     vTaskStartScheduler();
 

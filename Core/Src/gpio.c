@@ -33,6 +33,8 @@
 /* USER CODE END 1 */
 
 /** Configure pins
+     PH0-OSC_IN(PH0)   ------> RCC_OSC_IN
+     PH1-OSC_OUT(PH1)   ------> RCC_OSC_OUT
      PA2   ------> USART2_TX
      PA3   ------> USART2_RX
      PA13(JTMS/SWDIO)   ------> DEBUG_JTMS-SWDIO
@@ -46,6 +48,7 @@ void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
