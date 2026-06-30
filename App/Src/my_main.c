@@ -286,9 +286,9 @@ int my_main() {
     }
 
     SH1106_Init();
-    SH1106_GotoXY(10, 10);
+    SH1106_GotoXY(0, 0);
     SH1106_Puts("HELLO", &Font_11x18, 1);
-    SH1106_GotoXY(10, 30);
+    SH1106_GotoXY(0, 20);
     SH1106_Puts("WORLD !!", &Font_11x18, 1);
     SH1106_UpdateScreen();
 

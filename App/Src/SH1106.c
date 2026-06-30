@@ -113,7 +113,7 @@ void SH1106_UpdateScreen(void) {
 	
 	for (m = 0; m < 8; m++) {
 		SH1106_WRITECOMMAND(0xB0 + m);
-		SH1106_WRITECOMMAND(0x00);
+		SH1106_WRITECOMMAND(0x02);
 		SH1106_WRITECOMMAND(0x10);
 		
 		/* Write multi data */
