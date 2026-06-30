@@ -8,6 +8,9 @@
 #include "tim.h"
 #include "timers.h"
 
+#include "SH1106.h"
+#include "fonts.h"
+
 // timer clock: 16Mhz
 // prescaler: 15
 // => frequency: 16Mhz / 16 = 1Mhz
@@ -281,6 +284,13 @@ int my_main() {
     } else if (rc == HAL_ERROR) {
         printf("HAL_ERROR\n");
     }
+
+    SH1106_Init();
+    SH1106_GotoXY(10, 10);
+    SH1106_Puts("HELLO", &Font_11x18, 1);
+    SH1106_GotoXY(10, 30);
+    SH1106_Puts("WORLD !!", &Font_11x18, 1);
+    SH1106_UpdateScreen();
 
     vTaskStartScheduler();
 
