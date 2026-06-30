@@ -3,6 +3,7 @@
 #include "queue.h"
 #include "stdbool.h"
 #include "stm32h5xx_nucleo.h"
+#include "i2c.h"
 #include "task.h"
 #include "tim.h"
 #include "timers.h"
@@ -269,6 +270,17 @@ int my_main() {
 
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 0);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
+
+    HAL_StatusTypeDef rc = HAL_I2C_IsDeviceReady(&hi2c1, 0x3C << 1, 3, 100);
+    if (rc == HAL_OK) {
+        printf("HAL_OK\n");
+    } else if (rc == HAL_BUSY) {
+        printf("HAL_BUSY\n");
+    } else if (rc == HAL_TIMEOUT) {
+        printf("HAL_TIMEOUT\n");
+    } else if (rc == HAL_ERROR) {
+        printf("HAL_ERROR\n");
+    }
 
     vTaskStartScheduler();
 
