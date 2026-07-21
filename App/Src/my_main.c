@@ -38,6 +38,9 @@ const uint32_t PITCH_STEP = 5;       // How much the pitch changes per RPM devia
 const uint32_t MIN_ARR = 200;        // Upper limit for pitch (preventing ultrasonic/overflow)
 const uint32_t MAX_ARR = 4000;       // Lower limit for pitch (preventing clicking noises)
 
+
+#define WHEEL_RADIUS_METERS  0.3f
+
 enum Button {
     BUTTON_SET,
     BUTTON_RESET,
@@ -59,6 +62,10 @@ QueueSetHandle_t fsm_set = NULL;
 QueueHandle_t target_queue_to_buzzer = NULL;
 QueueHandle_t rpm_queue_to_buzzer = NULL;
 QueueSetHandle_t buzzer_set = NULL;
+
+QueueHandle_t target_queue_to_oled = NULL;
+QueueHandle_t rpm_queue_to_oled = NULL;
+QueueSetHandle_t oled_set = NULL;
 
 TimerHandle_t buzzer_timer = NULL;
 uint32_t buzzer_timer_period = BASE_BEEP_PERIOD;
@@ -109,6 +116,52 @@ uint8_t update_buzzer(float rpm, float target, uint8_t buzzer_buzzing) {
 
     return buzzer_buzzing;
 }  
+
+void oled(void *args) {
+    float rpm = 0.0f;
+    float target_rpm = 0.0f;
+    float kmh = 0.0f;
+
+    char str_buf[32];
+
+    for (;;) {
+        // Block until either rpm or target queue sends data
+        QueueSetMemberHandle_t selected = xQueueSelectFromSet(oled_set, portMAX_DELAY);
+
+        if (selected == rpm_queue_to_oled) {
+            xQueueReceive(rpm_queue_to_oled, &rpm, 0);
+        } else if (selected == target_queue_to_oled) {
+            xQueueReceive(target_queue_to_oled, &target_rpm, 0);
+        }
+
+        // Calculate Speed (km/h) = RPM * 2 * PI * Radius * (60 mins / 1000 meters)
+        kmh = rpm * (2.0f * 3.14159265f * WHEEL_RADIUS_METERS) * 0.06f;
+
+        // Clear screen buffer for redraw
+        SH1106_Clear();
+
+        // Line 1: Current RPM
+        snprintf(str_buf, sizeof(str_buf), "RPM: %.1f", rpm);
+        SH1106_GotoXY(0, 0);
+        SH1106_Puts(str_buf, &Font_7x10, 1);
+
+        // Line 2: Target RPM
+        if (target_rpm != 0)
+            snprintf(str_buf, sizeof(str_buf), "TGT: %.1f", target_rpm);
+        else 
+            sprintf(str_buf, "TGT: not set");
+        SH1106_GotoXY(0, 16);
+        SH1106_Puts(str_buf, &Font_7x10, 1);
+
+        // Line 3: Speed in km/h
+        snprintf(str_buf, sizeof(str_buf), "SPD: %.2f km/h", kmh);
+        SH1106_GotoXY(0, 32);
+        SH1106_Puts(str_buf, &Font_7x10, 1);
+
+        // Render buffer to screen
+        SH1106_UpdateScreen();
+    }
+}
 
 void buzzer(void *args) {
     float target = 0.0f;
@@ -175,6 +228,7 @@ void fsm(void *args) {
                 if (state == RUNNING)
                     state = RUNNING_TARGET_SET;
                 xQueueOverwrite(target_queue_to_buzzer, &target_rpm);
+                xQueueOverwrite(target_queue_to_oled, &target_rpm);
                 break;
             case BUTTON_RESET:
                 break;
@@ -221,6 +275,7 @@ void rpm_calc(void *args) {
 
         xQueueOverwrite(rpm_queue_to_fsm, &rpm);
         xQueueOverwrite(rpm_queue_to_buzzer, &rpm);
+        xQueueOverwrite(rpm_queue_to_oled, &rpm);
     }
 }
 
@@ -261,11 +316,18 @@ int my_main() {
     xQueueAddToSet(target_queue_to_buzzer, buzzer_set);
     xQueueAddToSet(rpm_queue_to_buzzer, buzzer_set);
 
+    target_queue_to_oled = xQueueCreate(1, sizeof(float));
+    rpm_queue_to_oled = xQueueCreate(1, sizeof(float));
+    oled_set = xQueueCreateSet(2);
+    xQueueAddToSet(target_queue_to_oled, oled_set);
+    xQueueAddToSet(rpm_queue_to_oled, oled_set);
+
     UserButton_Init(GPIO_MODE_IT_RISING);
 
     xTaskCreate(rpm_calc, "rpm", 300, NULL, 0, NULL);
     xTaskCreate(fsm, "fsm", 300, NULL, 0, NULL);
     xTaskCreate(buzzer, "buzzer", 300, NULL, 0, NULL);
+    xTaskCreate(oled, "oled", 300, NULL, 1, NULL);
 
     buzzer_timer = xTimerCreate("buz", 100, pdTRUE, 0, buzzer_timer_cb);
 
@@ -274,23 +336,23 @@ int my_main() {
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 0);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
 
-    HAL_StatusTypeDef rc = HAL_I2C_IsDeviceReady(&hi2c1, 0x3C << 1, 3, 100);
-    if (rc == HAL_OK) {
-        printf("HAL_OK\n");
-    } else if (rc == HAL_BUSY) {
-        printf("HAL_BUSY\n");
-    } else if (rc == HAL_TIMEOUT) {
-        printf("HAL_TIMEOUT\n");
-    } else if (rc == HAL_ERROR) {
-        printf("HAL_ERROR\n");
-    }
-
-    SH1106_Init();
-    SH1106_GotoXY(0, 0);
-    SH1106_Puts("HELLO", &Font_11x18, 1);
-    SH1106_GotoXY(0, 20);
-    SH1106_Puts("WORLD !!", &Font_11x18, 1);
-    SH1106_UpdateScreen();
+    // HAL_StatusTypeDef rc = HAL_I2C_IsDeviceReady(&hi2c1, 0x3C << 1, 3, 100);
+    // if (rc == HAL_OK) {
+    //     printf("HAL_OK\n");
+    // } else if (rc == HAL_BUSY) {
+    //     printf("HAL_BUSY\n");
+    // } else if (rc == HAL_TIMEOUT) {
+    //     printf("HAL_TIMEOUT\n");
+    // } else if (rc == HAL_ERROR) {
+    //     printf("HAL_ERROR\n");
+    // }
+    //
+    // SH1106_Init();
+    // SH1106_GotoXY(0, 0);
+    // SH1106_Puts("HELLO", &Font_11x18, 1);
+    // SH1106_GotoXY(0, 20);
+    // SH1106_Puts("WORLD !!", &Font_11x18, 1);
+    // SH1106_UpdateScreen();
 
     vTaskStartScheduler();
 
