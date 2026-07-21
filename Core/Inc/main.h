@@ -60,6 +60,12 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define RESET_BTN_Pin GPIO_PIN_0
+#define RESET_BTN_GPIO_Port GPIOC
+#define RESET_BTN_EXTI_IRQn EXTI0_IRQn
+#define SET_BTN_Pin GPIO_PIN_1
+#define SET_BTN_GPIO_Port GPIOC
+#define SET_BTN_EXTI_IRQn EXTI1_IRQn
 #define SWDIO_Pin GPIO_PIN_13
 #define SWDIO_GPIO_Port GPIOA
 #define SWCLK_Pin GPIO_PIN_14

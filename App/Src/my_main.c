@@ -1,5 +1,4 @@
 #include "FreeRTOS.h"
-#include "button.h"
 #include "queue.h"
 #include "stdbool.h"
 #include "stm32h5xx_nucleo.h"
@@ -291,11 +290,13 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
     }
 }
 
-void USER_BUTTON_Callback() {
+void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
+    if (GPIO_Pin != RESET_BTN_Pin && GPIO_Pin != SET_BTN_Pin)
+        return;
 
     BaseType_t xHigherPriorityTaskWoken;
 
-    enum Button button = BUTTON_SET;
+    enum Button button = (GPIO_Pin == RESET_BTN_Pin) ? BUTTON_RESET : BUTTON_SET;
     xQueueSendFromISR(button_queue_to_fsm, &button, &xHigherPriorityTaskWoken);
 
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
@@ -322,7 +323,7 @@ int my_main() {
     xQueueAddToSet(target_queue_to_oled, oled_set);
     xQueueAddToSet(rpm_queue_to_oled, oled_set);
 
-    UserButton_Init(GPIO_MODE_IT_RISING);
+    //UserButton_Init(GPIO_MODE_IT_RISING);
 
     xTaskCreate(rpm_calc, "rpm", 300, NULL, 0, NULL);
     xTaskCreate(fsm, "fsm", 300, NULL, 0, NULL);
