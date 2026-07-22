@@ -123,6 +123,8 @@ void oled(void *args) {
 
     char str_buf[32];
 
+    SH1106_Init();
+
     for (;;) {
         // Block until either rpm or target queue sends data
         QueueSetMemberHandle_t selected = xQueueSelectFromSet(oled_set, portMAX_DELAY);
@@ -230,6 +232,9 @@ void fsm(void *args) {
                 xQueueOverwrite(target_queue_to_oled, &target_rpm);
                 break;
             case BUTTON_RESET:
+                target_rpm = 0;
+                xQueueOverwrite(target_queue_to_buzzer, &target_rpm);
+                xQueueOverwrite(target_queue_to_oled, &target_rpm);
                 break;
             }
         }
