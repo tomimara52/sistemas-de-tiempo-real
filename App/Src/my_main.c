@@ -250,23 +250,23 @@ void fsm(void *args) {
             }
         }
 
-        switch (state) {
-        case STOPPED:
-            printf("stopped\t");
-            break;
-        case RUNNING:
-            printf("running\t");
-            break;
-        case RUNNING_TARGET_SET:
-            printf("running target set\t");
-            break;
-        case STOPPED_TARGET_SET:
-            printf("stopped target set\t");
-            break;
-        }
-        printf("rpm: %d.%02d\t", (int)rpm, ((int)(rpm * 100)) % 100);
-        printf("target rpm: %d.%02d\n", (int)target_rpm,
-               ((int)(target_rpm * 100)) % 100);
+        // switch (state) {
+        // case STOPPED:
+        //     printf("stopped\t");
+        //     break;
+        // case RUNNING:
+        //     printf("running\t");
+        //     break;
+        // case RUNNING_TARGET_SET:
+        //     printf("running target set\t");
+        //     break;
+        // case STOPPED_TARGET_SET:
+        //     printf("stopped target set\t");
+        //     break;
+        // }
+        // printf("rpm: %d.%02d\t", (int)rpm, ((int)(rpm * 100)) % 100);
+        // printf("target rpm: %d.%02d\n", (int)target_rpm,
+        //        ((int)(target_rpm * 100)) % 100);
     }
 }
 
@@ -341,10 +341,10 @@ int my_main() {
 
     //UserButton_Init(GPIO_MODE_IT_RISING);
 
-    xTaskCreate(rpm_calc, "rpm", 300, NULL, 0, NULL);
-    xTaskCreate(fsm, "fsm", 300, NULL, 0, NULL);
-    xTaskCreate(buzzer, "buzzer", 300, NULL, 0, NULL);
-    xTaskCreate(oled, "oled", 300, NULL, 1, NULL);
+    xTaskCreate(rpm_calc, "rpm", 300, NULL, 2, NULL);
+    xTaskCreate(fsm, "fsm", 300, NULL, 1, NULL);
+    xTaskCreate(buzzer, "buzzer", 300, NULL, 1, NULL);
+    xTaskCreate(oled, "oled", 300, NULL, 0, NULL);
 
     buzzer_timer = xTimerCreate("buz", 100, pdTRUE, 0, buzzer_timer_cb);
 
