@@ -214,10 +214,12 @@ void fsm(void *args) {
                 state = STOPPED;
             } else if (state == RUNNING_TARGET_SET && rpm == 0.0f) {
                 state = STOPPED_TARGET_SET;
+                xQueueOverwrite(target_queue_to_buzzer, &rpm);
             } else if (state == STOPPED && rpm > 0.0f) {
                 state = RUNNING;
             } else if (state == STOPPED_TARGET_SET && rpm > 0.0f) {
                 state = RUNNING_TARGET_SET;
+                xQueueOverwrite(target_queue_to_buzzer, &target_rpm);
             }
         } else if (selected == button_queue_to_fsm) {
             enum Button button;
@@ -225,14 +227,23 @@ void fsm(void *args) {
 
             switch (button) {
             case BUTTON_SET:
-                target_rpm = rpm;
                 if (state == RUNNING)
                     state = RUNNING_TARGET_SET;
-                xQueueOverwrite(target_queue_to_buzzer, &target_rpm);
-                xQueueOverwrite(target_queue_to_oled, &target_rpm);
+
+                if (state == RUNNING_TARGET_SET) {
+                    target_rpm = rpm;
+                    xQueueOverwrite(target_queue_to_buzzer, &target_rpm);
+                    xQueueOverwrite(target_queue_to_oled, &target_rpm);
+                }
                 break;
             case BUTTON_RESET:
                 target_rpm = 0;
+
+                if (state == RUNNING_TARGET_SET)
+                    state = RUNNING;
+                else if (state == STOPPED_TARGET_SET) 
+                    state = STOPPED;
+
                 xQueueOverwrite(target_queue_to_buzzer, &target_rpm);
                 xQueueOverwrite(target_queue_to_oled, &target_rpm);
                 break;
