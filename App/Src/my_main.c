@@ -18,6 +18,10 @@ const float TIMER_FREQ_FLOAT = (float)TIMER_FREQ;
 
 const uint32_t MAX_PERIOD_MS = 6000;
 
+// discard measurings faster than this
+const float MAX_RPM = 750.0f;
+const uint32_t MIN_PERIOD = (TIMER_FREQ_FLOAT / MAX_RPM) * 60.0f;
+
 // have to be more than THRESH_PERCENT% away from target_rpm for buzzer to sound
 const uint32_t THRESH_PERCENT = 10;
 const float THRESH_LOWER = 1.0f - ((float)THRESH_PERCENT / 100.0f);
@@ -31,7 +35,6 @@ const uint32_t BASE_BEEP_PERIOD = 750;
 const uint32_t MIN_BEEP_PERIOD = 100;
 const uint32_t RPM_BEEP_STEP = 5;
 
-// Assuming your default CubeMX ARR for TIM3 is 1000
 const uint32_t BASE_ARR = 1000; 
 const uint32_t PITCH_STEP = 5;       // How much the pitch changes per RPM deviance
 const uint32_t MIN_ARR = 200;        // Upper limit for pitch (preventing ultrasonic/overflow)
@@ -281,8 +284,13 @@ void rpm_calc(void *args) {
         if (xQueueReceive(ir_queue, &new_capture,
                           pdMS_TO_TICKS(MAX_PERIOD_MS)) == pdPASS) {
 
+            uint32_t new_period_unfiltered = new_capture - prev_capture;
+
+            if (new_period_unfiltered < MIN_PERIOD)
+                continue;
+
             period =
-                ALPHA * (new_capture - prev_capture) + (1.0f - ALPHA) * period;
+                ALPHA * new_period_unfiltered + (1.0f - ALPHA) * period;
             rpm = (TIMER_FREQ_FLOAT / period) * 60.0f;
 
             prev_capture = new_capture;
