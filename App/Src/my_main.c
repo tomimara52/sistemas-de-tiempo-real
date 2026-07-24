@@ -41,7 +41,7 @@ const uint32_t MIN_ARR = 200;        // Upper limit for pitch (preventing ultras
 const uint32_t MAX_ARR = 4000;       // Lower limit for pitch (preventing clicking noises)
 
 
-#define WHEEL_RADIUS_METERS  0.3f
+#define WHEEL_RADIUS_METERS  0.21f
 
 enum Button {
     BUTTON_SET,
